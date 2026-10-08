@@ -4,6 +4,15 @@ A macOS menu bar clock that shows the time in UTC. Click it to copy the current 
 
 ## Install
 
+With Homebrew, which builds it from source and starts it at every login:
+
+```
+brew install hhsnopek/tap/utc-clock
+brew services start utc-clock
+```
+
+Or from a clone:
+
 ```
 make install
 ```
