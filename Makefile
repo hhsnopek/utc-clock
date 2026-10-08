@@ -11,6 +11,7 @@ build:
 
 install: build
 	pkill -x UTCClock || true
+	while pgrep -qx UTCClock; do sleep 0.1; done
 	rm -rf "$(PREFIX)/$(APP)"
 	ditto "build/$(APP)" "$(PREFIX)/$(APP)"
 	open -g "$(PREFIX)/$(APP)"

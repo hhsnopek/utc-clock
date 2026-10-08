@@ -4,11 +4,19 @@ final class Clock: NSObject, NSApplicationDelegate {
 	private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 	private let menu = NSMenu()
 	private let time = utc("HH:mm 'UTC'")
-	private let stamp = utc("yyyy-MM-dd HH:mm:ss")
+	private let stamp = utc("yyyy-MM-dd'T'HH:mm:ss")
+	// Fixed-width digits keep the clock's width, and the icons beside it,
+	// from shifting as the minutes change.
+	private let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.menuBarFont(ofSize: 0).pointSize, weight: .regular)
+	private let icon = symbol("clock")
+	private let copiedIcon = clipboardCircle(.systemGreen)
 	private var tick: Timer?
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+		item.button?.font = font
+		item.button?.image = icon
+		item.button?.imagePosition = .imageLeading
 		item.button?.target = self
 		item.button?.action = #selector(click)
 		item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -37,19 +45,38 @@ final class Clock: NSObject, NSApplicationDelegate {
 			return
 		}
 		NSPasteboard.general.clearContents()
-		NSPasteboard.general.setString(timestamptz(Date()), forType: .string)
-		item.button?.title = "Copied"
-		perform(#selector(update), with: nil, afterDelay: 1)
+		NSPasteboard.general.setString(rfc3339(Date()), forType: .string)
+		confirm()
 	}
 
-	// timestamptz renders date the way Postgres prints a timestamptz in a UTC
-	// session. DateFormatter stops at milliseconds, so the microseconds are
-	// formatted by hand from the whole-second remainder.
-	private func timestamptz(_ date: Date) -> String {
+	// Both icons are the same size, so the swap never moves the menu bar.
+	private func confirm() {
+		fade(to: copiedIcon)
+		NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(restoreIcon), object: nil)
+		perform(#selector(restoreIcon), with: nil, afterDelay: 1)
+	}
+
+	@objc private func restoreIcon() {
+		fade(to: icon)
+	}
+
+	private func fade(to image: NSImage?) {
+		guard let button = item.button else { return }
+		let transition = CATransition()
+		transition.type = .fade
+		transition.duration = 0.2
+		button.wantsLayer = true
+		button.layer?.add(transition, forKey: nil)
+		button.image = image
+	}
+
+	// DateFormatter stops at milliseconds, so the microseconds are formatted
+	// by hand from the whole-second remainder.
+	private func rfc3339(_ date: Date) -> String {
 		let t = date.timeIntervalSince1970
 		let secs = t.rounded(.down)
 		let micros = Int((t - secs) * 1_000_000)
-		return stamp.string(from: Date(timeIntervalSince1970: secs)) + String(format: ".%06d+00", micros)
+		return stamp.string(from: Date(timeIntervalSince1970: secs)) + String(format: ".%06dZ", micros)
 	}
 }
 
@@ -59,6 +86,27 @@ func utc(_ format: String) -> DateFormatter {
 	f.timeZone = TimeZone(identifier: "UTC")
 	f.dateFormat = format
 	return f
+}
+
+func symbol(_ name: String, scale: CGFloat = 1, weight: NSFont.Weight = .regular) -> NSImage? {
+	let config = NSImage.SymbolConfiguration(pointSize: NSFont.menuBarFont(ofSize: 0).pointSize * scale, weight: weight)
+	return NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+}
+
+// SF Symbols has no clipboard in a circle, so this draws one from the circle
+// the clock symbol is built on, with a clipboard inside at the weight of the
+// clock's hands.
+func clipboardCircle(_ color: NSColor) -> NSImage? {
+	guard let ring = symbol("circle"), let glyph = symbol("clipboard", scale: 0.5, weight: .semibold) else { return nil }
+	return NSImage(size: ring.size, flipped: false) { rect in
+		ring.draw(in: rect)
+		let g = glyph.size
+		// A point above center, which reads as centered with the clip on top.
+		glyph.draw(in: NSRect(x: (rect.width - g.width) / 2, y: (rect.height - g.height) / 2 + 1, width: g.width, height: g.height))
+		color.set()
+		rect.fill(using: .sourceAtop)
+		return true
+	}
 }
 
 let clock = Clock()

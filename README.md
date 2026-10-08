@@ -1,6 +1,6 @@
 # UTC Clock
 
-A macOS menu bar clock that shows the time in UTC. Click it to copy the current time as a Postgres `timestamptz`, such as `2026-10-08 13:15:02.123456+00`. Right-click or Control-click it for Quit.
+A macOS menu bar clock that shows the time in UTC. Click it to copy the current time as an RFC 3339 timestamp with microseconds, such as `2026-10-08T13:15:02.123456Z`; its clock icon turns into a green clipboard for a second to confirm the copy. Right-click or Control-click it for Quit.
 
 ## Install
 
